@@ -443,7 +443,7 @@ document.addEventListener('click', (e)=>{
     const k = t.dataset.kind;
     const ids = t.dataset.ids ? t.dataset.ids.split(',') : [t.dataset.id];
     ids.forEach(id => { if(t.checked) sel[k].add(id); else sel[k].delete(id); });
-    if(k === 'inv') renderInventario(); else renderSelBar(k, lastVisible[k]);
+    if(k === 'inv') renderInventario(); else if(k === 'fichas' && t.dataset.ids) renderDashboard(); else renderSelBar(k, lastVisible[k]);
   }
 }, true);
 document.addEventListener('click', (e)=>{
@@ -808,7 +808,7 @@ function renderStats(){
   const agora = Date.now();
   const todasAbertas = fichas.filter(f=>f.status==='aberta');
   const atrasadas = todasAbertas
-    .filter(f=>f.dataAssinaturaRetirada)
+    .filter(f=>f.dataAssinaturaRetirada && !f.importada)
     .map(f=>({f, dias: Math.floor((agora - new Date(f.dataAssinaturaRetirada).getTime())/86400000)}))
     .filter(x=>x.dias >= LIMITE_DIAS)
     .sort((a,b)=> b.dias - a.dias)
@@ -908,6 +908,8 @@ function getFichasFiltradas(){
   items.sort((a,b)=> new Date(b.criadoEm) - new Date(a.criadoEm));
   return items;
 }
+const fichasAbertas = new Set();   // colaboradores cuja lista de fichas está aberta
+function chaveColab(f){ return (f.colaborador||'').trim().toLowerCase().replace(/\s+/g, ' '); }
 function renderDashboard(){
   const list = document.getElementById('ficha-list');
   const items = getFichasFiltradas();
@@ -917,24 +919,64 @@ function renderDashboard(){
     list.innerHTML = `<div class="empty"><b>Nenhuma ficha encontrada</b>${canManage ? 'Crie uma nova ficha selecionando a função do colaborador.' : 'Ainda não há fichas registradas.'}</div>`;
     return;
   }
-  list.innerHTML = items.map(f => {
+  // Uma linha por colaborador (menu suspenso); dentro dela ficam todas as fichas dele
+  const grupos = new Map();
+  items.forEach(f => {
+    const k = chaveColab(f);
+    if(!grupos.has(k)) grupos.set(k, {key:k, nome:(f.colaborador||'').trim(), fichas:[]});
+    grupos.get(k).fichas.push(f);
+  });
+  const lista = [...grupos.values()].sort((a,b)=> (a.nome||'~').localeCompare(b.nome||'~', 'pt-BR'));
+  const abrirTudo = searchTerm.trim() !== '' && lista.length <= 3;
+
+  const linhaFicha = (f) => {
     const statusLabel = f.status === 'concluida' ? 'Concluída' : (f.status === 'aberta' ? 'Em aberto' : 'Rascunho');
     const statusClass = f.status === 'concluida' ? 'concluida' : 'aberta';
-    const qtdItens = f.itens.filter(i => i.condEntrega).length;
+    const qtdItens = f.itens.filter(i => i.condEntrega || f.importada).length;
     return `<div class="ficha-row status-${statusClass}" data-id="${f.id}">
       <div class="fr-main">
-        <div class="fr-name">${selBox('fichas', f.id)}${escapeHtml(f.colaborador) || 'Colaborador não informado'}</div>
+        <div class="fr-name">${selBox('fichas', f.id)}${escapeHtml(f.funcao || 'Ficha')}${f.importada ? ' <span class="pill modelo">importada do inventário</span>' : ''}</div>
         <div class="fr-meta">
-          <span class="funcao-badge">${escapeHtml(f.funcao)}</span>
-          ${regiaoDaFicha(f) ? `<span>${regiaoDaFicha(f)}</span>` : ''}
-          ${centroCustoDaFicha(f) ? `<span>${escapeHtml(centroCustoDaFicha(f))}</span>` : ''}
           <span>${qtdItens}/${f.itens.length||0} itens registrados</span>
           <span>Criada em ${fmtDate(f.criadoEm).split(' às')[0]}</span>
         </div>
       </div>
       <div class="fr-right"><span class="status-badge ${statusClass}">${statusLabel.toUpperCase()}</span></div>
     </div>`;
-  }).join("");
+  };
+
+  list.innerHTML = lista.map(g => {
+    const ids = g.fichas.map(f => f.id);
+    const todos = ids.every(id => sel.fichas.has(id)), algum = ids.some(id => sel.fichas.has(id));
+    const chk = `<input type="checkbox" class="sel-box" data-kind="fichas" data-ids="${ids.join(',')}" ${todos ? 'checked' : ''} ${algum && !todos ? 'data-indet="1"' : ''} title="Selecionar todas as fichas deste colaborador para exportar">`;
+    const abertas = g.fichas.filter(f => f.status !== 'concluida').length;
+    const concl = g.fichas.length - abertas;
+    const aberto = abrirTudo || fichasAbertas.has(g.key);
+    const f0 = g.fichas[0];
+    const nItens = g.fichas.filter(f => f.status !== 'concluida').reduce((n,f)=> n + f.itens.filter(i=>!i.trocado && !i.liberadoManual).length, 0);
+    return `<div class="list-row ${abertas ? 'situacao-alocado' : 'situacao-disponivel'}" data-gkey="${escapeHtml(g.key)}">
+      <div class="list-row-head" style="cursor:pointer;">
+        <div>
+          <div class="lr-name">${chk}<span class="fc-arrow">${aberto ? '▾' : '▸'}</span> ${escapeHtml(g.nome) || 'Colaborador não informado'} <span class="pill modelo">${g.fichas.length} ficha${g.fichas.length>1?'s':''}</span></div>
+          <div class="lr-meta">
+            ${regiaoDaFicha(f0) ? `<span>${regiaoDaFicha(f0)}</span>` : ''}
+            ${centroCustoDaFicha(f0) ? `<span>${escapeHtml(centroCustoDaFicha(f0))}</span>` : ''}
+            ${abertas ? `<span>${abertas} em aberto${nItens ? ' · ' + nItens + (nItens>1 ? ' itens' : ' item') + ' com o colaborador' : ''}</span>` : ''}
+            ${concl ? `<span>${concl} concluída${concl>1?'s':''}</span>` : ''}
+          </div>
+        </div>
+        <span class="status-badge ${abertas ? 'aberta' : 'concluida'}">${abertas ? abertas + ' EM ABERTO' : 'CONCLUÍDAS'}</span>
+      </div>
+      ${aberto ? `<div class="row-detail" style="display:flex; flex-direction:column; gap:8px;">${g.fichas.map(linhaFicha).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+  list.querySelectorAll('[data-indet]').forEach(el => { el.indeterminate = true; });
+  list.querySelectorAll('.list-row-head').forEach(head=> head.addEventListener('click', (e)=>{
+    if(e.target.closest('button, input, label')) return;
+    const k = head.parentElement.dataset.gkey;
+    if(fichasAbertas.has(k)) fichasAbertas.delete(k); else fichasAbertas.add(k);
+    renderDashboard();
+  }));
   list.querySelectorAll('.ficha-row').forEach(row=> row.addEventListener('click', ()=> showFicha(row.dataset.id)));
 }
 document.getElementById('search-input').addEventListener('input', (e)=>{ searchTerm = e.target.value; renderDashboard(); });
@@ -1733,7 +1775,8 @@ function renderItems(f){
   const container = document.getElementById('items-container');
   const entregaEditable = !f.assinaturaRetirada && canManage;
   const devolucaoEditable = !!f.assinaturaRetirada && !f.assinaturaDevolucao && canManage;
-  const readOnlyBanner = !canManage ? '<div class="locked-note" style="margin-bottom:10px;">Modo consulta: você pode visualizar esta ficha, mas não editá-la.</div>' : '';
+  const importBanner = f.importada ? '<div class="locked-note" style="margin-bottom:10px;">Ficha criada pela importação do inventário geral: estes itens já estavam com o colaborador antes do sistema, por isso a retirada não tem condição, data nem assinatura. Registre a devolução normalmente quando eles voltarem.</div>' : '';
+  const readOnlyBanner = importBanner + (!canManage ? '<div class="locked-note" style="margin-bottom:10px;">Modo consulta: você pode visualizar esta ficha, mas não editá-la.</div>' : '');
 
   if(f.itens.length === 0){
     container.innerHTML = readOnlyBanner + `<div class="empty">Nenhum item adicionado ainda${f.tipo==='esporadica' ? ' — use o seletor acima para adicionar equipamentos do inventário.' : '.'}</div>`;
@@ -2004,7 +2047,7 @@ function renderSigRetirada(f){
   if(f.assinaturaRetirada){
     emptyBlock.classList.add('hidden'); savedBlock.classList.remove('hidden');
     document.getElementById('img-retirada').src = f.assinaturaRetirada;
-    document.getElementById('meta-retirada').textContent = 'Assinado em ' + fmtDate(f.dataAssinaturaRetirada);
+    document.getElementById('meta-retirada').textContent = f.importada ? 'Retirada anterior ao sistema — importada do inventário geral (sem assinatura)' : 'Assinado em ' + fmtDate(f.dataAssinaturaRetirada);
     return;
   }
   savedBlock.classList.add('hidden'); emptyBlock.classList.remove('hidden');
