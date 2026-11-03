@@ -476,6 +476,10 @@ function linhasFichasDe(lista){
         'Status da ficha': statusFichaLabel(f.status),
         'Criada em': fmtDataBR(f.criadoEm),
         'Retirada assinada em': f.dataAssinaturaRetirada ? fmtDate(f.dataAssinaturaRetirada) : '',
+        'Última renovação do prazo': f.renovadoEm ? fmtDate(f.renovadoEm) : '',
+        'Renovações': (f.renovacoes||[]).length || '',
+        'Dias com os itens': (f.status === 'aberta' && f.dataAssinaturaRetirada) ? Math.floor((Date.now() - new Date(f.dataAssinaturaRetirada).getTime())/86400000) : '',
+        'Prazo de 30 dias': f.status === 'aberta' ? (fichaVencida(f) ? 'Vencido' : 'Em dia') : '',
         'Devolução assinada em': f.dataAssinaturaDevolucao ? fmtDate(f.dataAssinaturaDevolucao) : ''
       };
       if(!f.itens.length){ out.push(Object.assign({}, base)); return; }
@@ -759,14 +763,40 @@ function renderTopActionsDashboard(){
     document.getElementById('top-actions').innerHTML = `<span class="funcao-badge" style="background:var(--line); color:var(--ink-soft);">MODO CONSULTA</span>`;
   }
 }
+/* ---------- Prazo das fichas em aberto: aviso aos 30 dias e renovação ---------- */
+const LIMITE_DIAS_FICHA = 30;
+function fichaBasePrazo(f){ return f.renovadoEm || f.dataAssinaturaRetirada || null; }
+function fichaDiasPrazo(f){ const b = fichaBasePrazo(f); return b ? Math.floor((Date.now() - new Date(b).getTime())/86400000) : 0; }
+function fichaVencida(f){ return f.status === 'aberta' && !!fichaBasePrazo(f) && fichaDiasPrazo(f) >= LIMITE_DIAS_FICHA; }
+function fichaProximoAviso(f){ const b = fichaBasePrazo(f); return b ? new Date(new Date(b).getTime() + LIMITE_DIAS_FICHA*86400000).toISOString() : null; }
+async function renovarFicha(id){
+  if(!canManage) return;
+  const f = getFichaById(id);
+  if(!f || f.status !== 'aberta') return;
+  const ativos = f.itens.filter(i => !i.trocado && !i.liberadoManual).length;
+  const v = await askForm('Renovar prazo da ficha',
+    `${escapeHtml(f.colaborador || 'Colaborador')} continua com ${ativos} item${ativos===1?'':'ns'}. O aviso volta em ${LIMITE_DIAS_FICHA} dias.`,
+    [{key:'obs', label:'Observação (opcional)', placeholder:'Ex.: obra em andamento até dezembro'}], 'Renovar por 30 dias');
+  if(!v) return;
+  const agora = new Date().toISOString();
+  f.renovadoEm = agora;
+  f.renovacoes = (f.renovacoes || []).concat([{data: agora, por: myId || null, obs: v.obs || ''}]);
+  await persistFichaNow(f);
+  showToast('Prazo renovado por 30 dias.');
+  if(viewVisible('view-ficha')){ renderTopActionsFicha(); renderItems(f); }
+  else if(viewVisible('view-dashboard')){ renderDashboard(); renderStats(); }
+}
 function renderTopActionsFicha(){
   const f = getFichaById(currentFichaId);
   let html = "";
   if(f && f.status === 'concluida'){ html = `<button class="btn btn-ghost" id="btn-print">Imprimir / PDF</button>`; }
+  if(f && f.status === 'aberta' && canManage){ html += ` <button class="btn ${fichaVencida(f) ? 'btn-primary' : 'btn-ghost'}" id="btn-renovar">Renovar prazo (30 dias)</button>`; }
   if(!canManage){ html += ` <span class="funcao-badge" style="background:var(--line); color:var(--ink-soft);">SOMENTE LEITURA</span>`; }
   document.getElementById('top-actions').innerHTML = html;
   const p = document.getElementById('btn-print');
   if(p) p.onclick = ()=> window.print();
+  const rn = document.getElementById('btn-renovar');
+  if(rn) rn.onclick = ()=> renovarFicha(currentFichaId);
 }
 
 /* ============================================================
@@ -804,15 +834,10 @@ function renderStats(){
 
   renderCharts(rascunhos.length, abertas.length, concluidas.length, disponiveis, manutencao, inventario.filter(i=>!i.baixado && invDisponivel(i)<=0 && (i.quantidadeManutencao||0)<=0).length);
 
-  const LIMITE_DIAS = 15;
-  const agora = Date.now();
   const todasAbertas = fichas.filter(f=>f.status==='aberta');
-  const atrasadas = todasAbertas
-    .filter(f=>f.dataAssinaturaRetirada && !f.importada)
-    .map(f=>({f, dias: Math.floor((agora - new Date(f.dataAssinaturaRetirada).getTime())/86400000)}))
-    .filter(x=>x.dias >= LIMITE_DIAS)
-    .sort((a,b)=> b.dias - a.dias)
-    .slice(0,5);
+  const vencidasTodas = todasAbertas.filter(fichaVencida).sort((a,b)=> fichaDiasPrazo(b) - fichaDiasPrazo(a));
+  const atrasadas = vencidasTodas.slice(0,8).map(f=>({f, dias: fichaDiasPrazo(f)}));
+  const maisVencidas = Math.max(0, vencidasTodas.length - atrasadas.length);
 
   const alertBox = document.getElementById('top-alert-list');
   const locAlertas = inventario
@@ -827,10 +852,12 @@ function renderStats(){
       </div>`).join('')
     + atrasadas.map(x=>`
       <div class="top-alert-row">
-        <span>${escapeHtml(x.f.colaborador||'Colaborador não informado')} — ${escapeHtml(x.f.funcao)} — em aberto há ${x.dias} dias</span>
-        <button class="btn btn-ghost btn-sm" data-open="${x.f.id}">Abrir</button>
-      </div>`).join('');
+        <span>${escapeHtml(x.f.colaborador||'Colaborador não informado')} — ${escapeHtml(x.f.funcao)} — prazo de ${LIMITE_DIAS_FICHA} dias vencido (${x.dias} dias com os itens${x.f.renovacoes && x.f.renovacoes.length ? ', renovada ' + x.f.renovacoes.length + 'x' : ''})</span>
+        <span style="display:flex; gap:6px;"><button class="btn btn-ghost btn-sm" data-open="${x.f.id}">Abrir</button>${canManage ? `<button class="btn btn-primary btn-sm" data-renovar="${x.f.id}">Renovar</button>` : ''}</span>
+      </div>`).join('')
+    + (maisVencidas ? `<div class="top-alert-row"><span>… e mais ${maisVencidas} ficha${maisVencidas>1?'s':''} com prazo vencido (veja na lista de fichas)</span></div>` : '');
   alertBox.querySelectorAll('[data-open]').forEach(b=> b.addEventListener('click', ()=> showFicha(b.dataset.open)));
+  alertBox.querySelectorAll('[data-renovar]').forEach(b=> b.addEventListener('click', ()=> renovarFicha(b.dataset.renovar)));
   alertBox.querySelectorAll('[data-goinv]').forEach(b=> b.addEventListener('click', ()=>{ const u = getInvById(b.dataset.goinv); expandedInvId = b.dataset.goinv; expandedGroup = u ? grupoKey(u) : null; showInventario(); }));
 }
 
@@ -961,6 +988,7 @@ function renderDashboard(){
           <div class="lr-meta">
             ${regiaoDaFicha(f0) ? `<span>${regiaoDaFicha(f0)}</span>` : ''}
             ${centroCustoDaFicha(f0) ? `<span>${escapeHtml(centroCustoDaFicha(f0))}</span>` : ''}
+            ${g.fichas.some(fichaVencida) ? `<span style="color:var(--ruim); font-weight:700;">${g.fichas.filter(fichaVencida).length} com prazo de 30 dias vencido</span>` : ''}
             ${abertas ? `<span>${abertas} em aberto${nItens ? ' · ' + nItens + (nItens>1 ? ' itens' : ' item') + ' com o colaborador' : ''}</span>` : ''}
             ${concl ? `<span>${concl} concluída${concl>1?'s':''}</span>` : ''}
           </div>
@@ -1776,7 +1804,10 @@ function renderItems(f){
   const entregaEditable = !f.assinaturaRetirada && canManage;
   const devolucaoEditable = !!f.assinaturaRetirada && !f.assinaturaDevolucao && canManage;
   const importBanner = f.importada ? '<div class="locked-note" style="margin-bottom:10px;">Ficha criada pela importação do inventário geral: estes itens já estavam com o colaborador antes do sistema, por isso a retirada não tem condição, data nem assinatura. Registre a devolução normalmente quando eles voltarem.</div>' : '';
-  const readOnlyBanner = importBanner + (!canManage ? '<div class="locked-note" style="margin-bottom:10px;">Modo consulta: você pode visualizar esta ficha, mas não editá-la.</div>' : '');
+  const prazoBanner = (f.status === 'aberta' && fichaBasePrazo(f)) ? (fichaVencida(f)
+    ? `<div class="locked-note" style="margin-bottom:10px; border-color:var(--ruim); color:var(--ruim);">Prazo de ${LIMITE_DIAS_FICHA} dias vencido há ${fichaDiasPrazo(f) - LIMITE_DIAS_FICHA} dia(s). Confirme com o colaborador e ${canManage ? 'renove o prazo (botão no topo) ou registre a devolução' : 'peça ao gerenciador para renovar ou registrar a devolução'}.${(f.renovacoes||[]).length ? ' Renovada ' + f.renovacoes.length + 'x.' : ''}</div>`
+    : `<div class="locked-note" style="margin-bottom:10px;">Itens com o colaborador há ${fichaDiasPrazo(f)} dia(s) · próximo aviso em ${fmtDataBR(fichaProximoAviso(f))}${f.renovadoEm ? ' (renovada em ' + fmtDataBR(f.renovadoEm) + ')' : ''}.</div>`) : '';
+  const readOnlyBanner = prazoBanner + importBanner + (!canManage ? '<div class="locked-note" style="margin-bottom:10px;">Modo consulta: você pode visualizar esta ficha, mas não editá-la.</div>' : '');
 
   if(f.itens.length === 0){
     container.innerHTML = readOnlyBanner + `<div class="empty">Nenhum item adicionado ainda${f.tipo==='esporadica' ? ' — use o seletor acima para adicionar equipamentos do inventário.' : '.'}</div>`;
