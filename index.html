@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Controle de Equipamentos — Unigás</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <img class="logo" src="assets/logo-unigas.jpg" alt="Unigás - Sistemas de Aquecimento">
+      <div class="brand-text">
+        <h1>B.I.G.O.D.E</h1>
+        <div class="subtitle">Base Integrada de Gestão Operacional De Equipamentos</div>
+      </div>
+    </div>
+    <div class="top-actions" id="top-actions"></div>
+  </header>
+
+  <div class="section-tabs" id="section-tabs">
+    <button type="button" class="section-tab" data-sec="fichas">Fichas</button>
+    <button type="button" class="section-tab" data-sec="inventario">Inventário</button>
+    <button type="button" class="section-tab" data-sec="colaboradores">Colaboradores</button>
+    <button type="button" class="btn btn-ghost btn-sm hidden" id="btn-export-excel" style="margin-left:auto;">⬇ Exportar Excel</button>
+  </div>
+
+  <!-- ================= DASHBOARD / FICHAS ================= -->
+  <section id="view-dashboard" class="hidden">
+    <div class="dash-toolbar" style="margin-bottom:12px;">
+      <label style="font-size:12px; color:var(--ink-soft); display:flex; align-items:center; gap:8px; margin:0;">
+        Período dos indicadores:
+        <select id="dash-periodo" style="width:auto;">
+          <option value="todos">Todo o histórico</option>
+          <option value="7d">Últimos 7 dias</option>
+          <option value="30d" selected>Últimos 30 dias</option>
+          <option value="mes">Este mês</option>
+        </select>
+      </label>
+    </div>
+    <div class="stat-grid" id="stat-grid"></div>
+    <div id="chart-grid" class="chart-grid"></div>
+    <div class="top-alert-list" id="top-alert-list"></div>
+    <div class="dash-toolbar">
+      <input type="text" class="search" id="search-input" placeholder="Buscar por colaborador ou função...">
+      <div class="filter-menu" id="filter-menu-fichas"></div>
+    </div>
+    <div class="sel-bar" id="sel-bar-fichas"></div>
+    <div id="ficha-list" class="ficha-list"></div>
+  </section>
+
+  <!-- ================= INVENTÁRIO ================= -->
+  <section id="view-inventario" class="hidden">
+    <div class="dash-toolbar">
+      <input type="text" class="search" id="inv-search-input" placeholder="Buscar por nome ou patrimônio...">
+      <div class="filter-menu" id="filter-menu-inv"></div>
+    </div>
+    <div class="inline-form-toggle">
+      <button class="btn btn-primary btn-sm" id="btn-toggle-inv-form">+ Novo item de inventário</button>
+    </div>
+    <div class="inline-form hidden" id="inv-new-form">
+      <h3 id="inv-form-title" style="font-family:'Barlow Condensed',sans-serif; font-size:17px; margin:0 0 12px;">Novo item de inventário</h3>
+      <div class="field-grid">
+        <div class="field">
+          <label>Nome / descrição da ferramenta</label>
+          <input type="text" id="inv-f-nome" placeholder="Ex: Furadeira Bosch 220V">
+        </div>
+        <div class="field">
+          <label>Patrimônio(s) — um por linha</label>
+          <textarea id="inv-f-patrimonios" rows="3" placeholder="FUR-001&#10;FUR-002&#10;FUR-003"></textarea>
+          <div class="locked-note" id="inv-f-pat-hint" style="margin-top:4px;"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Posse</label>
+        <select id="inv-f-posse">
+          <option value="proprio">Próprio</option>
+          <option value="locado">Locado</option>
+        </select>
+      </div>
+      <div class="hidden" id="inv-f-fornecedor-wrap">
+        <div class="field-grid">
+          <div class="field">
+            <label>Fornecedor / locadora</label>
+            <input type="text" id="inv-f-fornecedor" placeholder="Nome da empresa locadora">
+          </div>
+          <div class="field">
+            <label>Vencimento da locação</label>
+            <input type="date" id="inv-f-vencimento">
+          </div>
+        </div>
+        <div class="field-grid" id="inv-f-novo-wrap">
+          <div class="field">
+            <label>Início da locação</label>
+            <input type="date" id="inv-f-inicio">
+          </div>
+          <div class="field">
+            <label>Valor mensal da locação (R$)</label>
+            <input type="number" id="inv-f-valor" step="0.01" min="0" placeholder="0,00">
+          </div>
+        </div>
+        <div class="locked-note hidden" id="inv-f-edit-note" style="margin-bottom:10px;">Início, valor mensal e períodos da locação são alterados no <b>histórico de locação</b>, dentro do item.</div>
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button class="btn btn-ghost btn-sm" id="btn-cancel-inv-form">Cancelar</button>
+        <button class="btn btn-primary btn-sm" id="btn-save-inv-form">Salvar item</button>
+      </div>
+    </div>
+    <div class="inv-totais" id="inv-totais"></div>
+    <div class="sel-bar" id="sel-bar-inv"></div>
+    <div id="inv-list" class="row-list"></div>
+  </section>
+
+  <!-- ================= COLABORADORES ================= -->
+  <section id="view-colaboradores" class="hidden">
+    <div class="dash-toolbar">
+      <input type="text" class="search" id="colab-search-input" placeholder="Buscar por nome ou matrícula...">
+      <div class="filter-menu" id="filter-menu-colab"></div>
+    </div>
+    <div class="inline-form-toggle">
+      <button class="btn btn-primary btn-sm" id="btn-toggle-colab-form">+ Novo colaborador</button>
+    </div>
+    <div class="inline-form hidden" id="colab-new-form">
+      <h3 id="colab-form-title" style="font-family:'Barlow Condensed',sans-serif; font-size:17px; margin:0 0 12px;">Novo colaborador</h3>
+      <div class="field-grid">
+        <div class="field">
+          <label>Nome completo</label>
+          <input type="text" id="colab-f-nome" placeholder="Nome do colaborador">
+        </div>
+        <div class="field">
+          <label>Função</label>
+          <select id="colab-f-funcao"></select>
+        </div>
+      </div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Matrícula (opcional)</label>
+          <input type="text" id="colab-f-matricula" placeholder="Nº de matrícula">
+        </div>
+        <div class="field">
+          <label>Região</label>
+          <select id="colab-f-regiao">
+            <option value="">Sem região</option>
+            <option value="Interior">Interior (CPS, RP, SP)</option>
+            <option value="Vale">Vale (SJC)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Centro de custo</label>
+        <input type="text" id="colab-f-cc" list="cc-datalist" placeholder="Ex.: COMÉRCIO">
+        <datalist id="cc-datalist"></datalist>
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button class="btn btn-ghost btn-sm" id="btn-cancel-colab-form">Cancelar</button>
+        <button class="btn btn-primary btn-sm" id="btn-save-colab-form">Salvar colaborador</button>
+      </div>
+    </div>
+    <div class="sel-bar" id="sel-bar-colab"></div>
+    <div id="colab-list" class="row-list"></div>
+  </section>
+
+  <!-- ================= SELECIONAR FUNÇÃO ================= -->
+  <section id="view-select-funcao" class="hidden">
+    <button class="back-link" id="btn-back-funcao">← Voltar</button>
+    <div class="card">
+      <h2>Selecione a função do colaborador</h2>
+      <p class="intro-note">Cada função abre o termo já com a lista de equipamentos correspondente. Use "Entrega esporádica" para itens avulsos fora do padrão.</p>
+      <div class="funcao-grid" id="funcao-grid"></div>
+    </div>
+  </section>
+
+  <!-- ================= FICHA (retirada / devolução) ================= -->
+  <section id="view-ficha" class="hidden">
+    <button class="back-link" id="btn-back">← Voltar para todas as fichas</button>
+
+    <div class="card">
+      <h2>Colaborador</h2>
+      <div class="field-grid">
+        <div class="field">
+          <label for="f-nome">Nome do colaborador</label>
+          <input type="text" id="f-nome" list="colab-datalist" placeholder="Digite ou escolha da lista">
+          <datalist id="colab-datalist"></datalist>
+        </div>
+        <div class="field">
+          <label>Função</label>
+          <div class="funcao-readonly" id="f-funcao-display">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step-num">1</span> Equipamentos e condições</h2>
+      <div id="esporadica-adder-wrap"></div>
+      <div id="items-container"></div>
+    </div>
+
+    <div class="card" id="card-sig-retirada">
+      <h2><span class="step-num">2</span> Assinatura — Retirada</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;margin-bottom:12px;">
+        Ao assinar, o colaborador declara ter recebido os itens acima nas condições descritas e assume a responsabilidade pela sua guarda e devolução.
+      </p>
+      <div id="sig-retirada-empty"></div>
+      <div id="sig-retirada-saved" class="hidden">
+        <div class="signed-block">
+          <img class="sig-saved-img" id="img-retirada" style="max-width:220px;">
+          <div class="signed-meta"><b>Retirada confirmada</b><span id="meta-retirada"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card hidden" id="card-sig-devolucao">
+      <h2><span class="step-num">3</span> Assinatura — Devolução</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;margin-bottom:12px;">
+        Ao assinar, confirma-se a devolução dos itens acima nas condições registradas nesta etapa.
+      </p>
+      <div id="sig-devolucao-empty"></div>
+      <div id="sig-devolucao-saved" class="hidden">
+        <div class="signed-block">
+          <img class="sig-saved-img" id="img-devolucao" style="max-width:220px;">
+          <div class="signed-meta"><b>Devolução confirmada</b><span id="meta-devolucao"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-bar" id="bottom-bar"></div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<div id="confirm-root"></div>
+
+<!-- Biblioteca para gerar o Excel (precisa de internet) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Modo local: só entra em ação fora do Claude; pode ser removido ao ligar um backend real -->
+<script src="js/local-seed.js"></script>
+<!-- Google Planilhas: só ativa se js/sheets-config.js tiver o link do Apps Script -->
+<script src="js/sheets-config.js"></script>
+<script src="js/sheets-shim.js"></script>
+<script src="js/local-shim.js"></script>
+<!-- Aplicação -->
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+
+</html>
