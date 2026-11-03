@@ -48,7 +48,7 @@
               <div style="font-size:11px;margin-top:2px;opacity:.8;">Cadastra, edita e exclui tudo</div></button>
           </div>
           <label style="font-size:12px;font-weight:600;color:#333;">Matrícula</label>
-          <input id="bg-mat" required inputmode="numeric" autocomplete="username" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccc;border-radius:8px;margin:4px 0 12px;font-size:14px;">
+          <input id="bg-mat" required maxlength="8" placeholder="F0000000" autocapitalize="characters" autocomplete="username" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccc;border-radius:8px;margin:4px 0 12px;font-size:14px;">
           <label style="font-size:12px;font-weight:600;color:#333;">Código de acesso <span id="bg-modo-txt"></span></label>
           <input id="bg-cod" type="password" required style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccc;border-radius:8px;margin:4px 0 8px;font-size:14px;">
           <div id="bg-msg" style="min-height:18px;font-size:12px;color:#B00020;margin-bottom:8px;">${msg||''}</div>
@@ -69,8 +69,9 @@
       try{ const old = JSON.parse(localStorage.getItem(LS)||'null'); if(old) ov.querySelector('#bg-mat').value = old.matricula || ''; }catch(e){}
       ov.querySelector('form').addEventListener('submit', ev=>{
         ev.preventDefault();
-        const matricula = ov.querySelector('#bg-mat').value.trim();
+        const matricula = ov.querySelector('#bg-mat').value.replace(/\s/g, '').toUpperCase();
         const codigo = ov.querySelector('#bg-cod').value.trim();
+        if(!/^F\d{7}$/.test(matricula)){ ov.querySelector('#bg-msg').textContent = 'Digite a matrícula no formato F0000000 (letra F + 7 números).'; return; }
         ov.remove(); resolve({matricula, codigo, modo});
       });
     });
@@ -90,7 +91,7 @@
           papel = r.papel; lastV = r.v; cred.nome = r.nome || cred.matricula; localStorage.setItem(LS, JSON.stringify(cred)); return true;
         }catch(e){
           if(e.codigo === 'codigo') msg = 'Código incorreto.';
-          else if(e.codigo === 'matricula') msg = 'Matrícula não encontrada. Use a matrícula cadastrada na lista de colaboradores.';
+          else if(e.codigo === 'matricula') msg = 'Matrícula não encontrada. Confira o formato F0000000 e se você está na lista de colaboradores.';
           else if(e.codigo !== 'modo') msg = 'Não foi possível conectar à planilha. Verifique a internet e o link do Apps Script.';
           if(!modoAnterior && cred) modoAnterior = cred.modo;
           try{ localStorage.removeItem(LS); }catch(_){}
