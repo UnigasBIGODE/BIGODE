@@ -746,8 +746,11 @@ function showSelectFuncao(){
   document.getElementById('top-actions').innerHTML = "";
   renderFuncaoGrid();
 }
+/* Devolução parcial: 'todos' = ficha inteira; número = índice do item escolhido (por patrimônio) */
+let devAlvo = 'todos';
+function itemComColab(it){ return !it.trocado && !it.liberadoManual && !it.devolvidoParcial; }
 function showFicha(id){
-  currentFichaId = id;
+  currentFichaId = id; devAlvo = 'todos';
   hideAllViews(); showSectionTabs(false);
   document.getElementById('view-ficha').classList.remove('hidden');
   renderTopActionsFicha();
@@ -773,7 +776,7 @@ async function renovarFicha(id){
   if(!canManage) return;
   const f = getFichaById(id);
   if(!f || f.status !== 'aberta') return;
-  const ativos = f.itens.filter(i => !i.trocado && !i.liberadoManual).length;
+  const ativos = f.itens.filter(itemComColab).length;
   const v = await askForm('Renovar prazo da ficha',
     `${escapeHtml(f.colaborador || 'Colaborador')} continua com ${ativos} item${ativos===1?'':'ns'}. O aviso volta em ${LIMITE_DIAS_FICHA} dias.`,
     [{key:'obs', label:'Observação (opcional)', placeholder:'Ex.: obra em andamento até dezembro'}], 'Renovar por 30 dias');
@@ -980,7 +983,7 @@ function renderDashboard(){
     const concl = g.fichas.length - abertas;
     const aberto = abrirTudo || fichasAbertas.has(g.key);
     const f0 = g.fichas[0];
-    const nItens = g.fichas.filter(f => f.status !== 'concluida').reduce((n,f)=> n + f.itens.filter(i=>!i.trocado && !i.liberadoManual).length, 0);
+    const nItens = g.fichas.filter(f => f.status !== 'concluida').reduce((n,f)=> n + f.itens.filter(itemComColab).length, 0);
     return `<div class="list-row ${abertas ? 'situacao-alocado' : 'situacao-disponivel'}" data-gkey="${escapeHtml(g.key)}">
       <div class="list-row-head" style="cursor:pointer;">
         <div>
@@ -1568,7 +1571,7 @@ async function invAction(id, act){
   if(act === 'liberar'){
     if((item.quantidadeAlocada||0) <= 0){ showToast('Não há unidade alocada para liberar.'); return; }
     const holders = [];
-    fichas.filter(x=>x.status==='aberta').forEach(fx=> fx.itens.forEach((it,ix)=>{ if(it.inventarioId===item.id && !it.trocado && !it.liberadoManual) holders.push({f:fx, ix}); }));
+    fichas.filter(x=>x.status==='aberta').forEach(fx=> fx.itens.forEach((it,ix)=>{ if(it.inventarioId===item.id && itemComColab(it)) holders.push({f:fx, ix}); }));
     if(holders.length){
       const labels = holders.map(h=>`${escapeHtml(h.f.colaborador||'Sem nome')} — ${escapeHtml(h.f.funcao)} (retirado em ${fmtDataBR(h.f.itens[h.ix].dataRetirada)})`);
       labels.push('Liberar sem alterar nenhuma ficha');
@@ -1816,15 +1819,35 @@ function renderItems(f){
 
   const podeTrocar = canManage && f.status === 'aberta' && f.assinaturaRetirada && !f.assinaturaDevolucao;
 
-  container.innerHTML = readOnlyBanner + f.itens.map((item, idx) => {
-    if(item.trocado || item.liberadoManual){
+  const ativosIdx = f.itens.map((it,i)=> itemComColab(it) ? i : -1).filter(i => i >= 0);
+  if(devAlvo !== 'todos' && !ativosIdx.includes(devAlvo)) devAlvo = 'todos';
+  const seletorDev = (devolucaoEditable && ativosIdx.length > 1) ? `<div class="item-card" style="border-color:var(--ink);">
+      <div class="item-body"><div class="field" style="max-width:520px; margin:0;">
+        <label>O que o colaborador está devolvendo?</label>
+        <select id="sel-dev-alvo">
+          <option value="todos" ${devAlvo === 'todos' ? 'selected' : ''}>Ficha inteira — todos os ${ativosIdx.length} itens que estão com ele</option>
+          ${ativosIdx.map(i => `<option value="${i}" ${devAlvo === i ? 'selected' : ''}>Só este: ${escapeHtml(f.itens[i].patrimonio || 'sem patrimônio')} — ${escapeHtml(f.itens[i].nome)}</option>`).join('')}
+        </select>
+        <div class="sig-hint" style="margin-top:6px;">${devAlvo === 'todos' ? 'Preencha a devolução de todos os itens abaixo e assine uma vez.' : 'Preencha só o item escolhido e assine. Os outros continuam com o colaborador e a ficha segue em aberto.'}</div>
+      </div></div>
+    </div>` : '';
+  const historicoDev = ((f.devolucoes||[]).length && f.itens.some(i => i.devolvidoParcial)) ? `<div class="item-card"><div class="item-head"><span class="item-name-input" style="padding:2px;">Devoluções registradas nesta ficha</span></div><div class="item-body">${(f.devolucoes||[]).map(d => `<div class="locked-note" style="display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-bottom:6px;"><span><b>${fmtDate(d.data)}</b> — ${(d.itens||[]).map(x => escapeHtml((x.patrimonio ? x.patrimonio + ' ' : '') + x.nome)).join(', ')}</span>${d.assinatura ? `<img src="${d.assinatura}" alt="Assinatura" style="max-height:38px; background:#fff; border:1px solid var(--line); border-radius:4px;">` : ''}</div>`).join('')}</div></div>` : '';
+
+  container.innerHTML = readOnlyBanner + seletorDev + f.itens.map((item, idx) => {
+    if(devolucaoEditable && devAlvo !== 'todos' && idx !== devAlvo){
+      return `<div class="item-card" style="opacity:.8;">
+        <div class="item-head"><span class="item-name-input" style="padding:2px;">${escapeHtml(item.nome)} <span class="pill alocado" style="margin-left:6px;">Continua com o colaborador</span></span><span class="item-tag">ITEM ${String(idx+1).padStart(2,'0')}</span></div>
+        <div class="item-body"><div class="locked-note">Patrimônio ${escapeHtml(item.patrimonio || '—')}. <button type="button" class="btn btn-ghost btn-sm" data-dev-so="${idx}">Devolver só este</button></div></div>
+      </div>`;
+    }
+    if(item.trocado || item.liberadoManual || item.devolvidoParcial){
       return `<div class="item-card" style="opacity:.75;">
         <div class="item-head">
-          <span class="item-name-input" style="padding:2px;">${escapeHtml(item.nome)} <span class="pill baixado" style="margin-left:6px;">${item.liberadoManual ? 'Liberado' : 'Trocado'}</span></span>
+          <span class="item-name-input" style="padding:2px;">${escapeHtml(item.nome)} <span class="pill baixado" style="margin-left:6px;">${item.liberadoManual ? 'Liberado' : (item.devolvidoParcial ? 'Devolvido' : 'Trocado')}</span></span>
           <span class="item-tag">ITEM ${String(idx+1).padStart(2,'0')}</span>
         </div>
         <div class="item-body">
-          <div class="locked-note">${item.liberadoManual ? 'Liberado pelo inventário' : 'Devolvido na troca'} em ${fmtDateShort(item.dataDevolucao)} — condição registrada: ${escapeHtml(item.condDevolucao||'—')}${item.obsDevolucao ? ' ('+escapeHtml(item.obsDevolucao)+')' : ''}.${item.liberadoManual ? '' : ' Substituído por um novo item nesta ficha.'}</div>
+          <div class="locked-note">${item.liberadoManual ? 'Liberado pelo inventário' : (item.devolvidoParcial ? 'Devolvido' : 'Devolvido na troca')} em ${fmtDateShort(item.dataDevolucao)} — condição registrada: ${escapeHtml(item.condDevolucao||'—')}${item.obsDevolucao ? ' ('+escapeHtml(item.obsDevolucao)+')' : ''}.${(item.liberadoManual || item.devolvidoParcial) ? '' : ' Substituído por um novo item nesta ficha.'}</div>
         </div>
       </div>`;
     }
@@ -1879,7 +1902,11 @@ function renderItems(f){
         ${trocaEmAndamentoIdx === idx ? renderTrocaForm(f, idx) : ''}
       </div>
     </div>`;
-  }).join('');
+  }).join('') + historicoDev;
+
+  const selDev = document.getElementById('sel-dev-alvo');
+  if(selDev) selDev.addEventListener('change', ()=>{ devAlvo = selDev.value === 'todos' ? 'todos' : +selDev.value; renderItems(f); renderBottomBar(f); });
+  container.querySelectorAll('[data-dev-so]').forEach(b=> b.addEventListener('click', ()=>{ devAlvo = +b.dataset.devSo; renderItems(f); renderBottomBar(f); }));
 
   if(entregaEditable){
     container.querySelectorAll('.item-name-input').forEach(inp=> inp.addEventListener('input', (e)=>{ f.itens[+inp.dataset.idx].nome = e.target.value; scheduleSave(f); }));
@@ -2129,7 +2156,8 @@ function renderBottomBar(f){
     bar.appendChild(del);
   } else if(canManage && f.assinaturaRetirada && !f.assinaturaDevolucao){
     const btn = document.createElement('button');
-    btn.className = 'btn btn-primary'; btn.textContent = 'Confirmar devolução e assinar';
+    const jaDev = f.itens.some(i => i.devolvidoParcial);
+    btn.className = 'btn btn-primary'; btn.textContent = (devAlvo !== 'todos') ? 'Confirmar devolução deste item e assinar' : (jaDev ? 'Confirmar devolução dos itens restantes e assinar' : 'Confirmar devolução e assinar');
     btn.addEventListener('click', ()=> confirmarDevolucao(f));
     bar.appendChild(btn);
     const del = document.createElement('button');
@@ -2174,8 +2202,9 @@ async function syncInventarioNaRetirada(f){
     }
   }
 }
-async function syncInventarioNaDevolucao(f){
-  for(const item of f.itens){
+async function syncInventarioNaDevolucao(f, apenas){
+  const lista = apenas || f.itens.filter(it => !it.devolvidoParcial);   // itens já devolvidos em devolução parcial já foram baixados
+  for(const item of lista){
     if(item.inventarioId && !item.trocado && !item.liberadoManual){
       const inv = getInvById(item.inventarioId);
       if(inv){
@@ -2208,18 +2237,35 @@ async function confirmarRetirada(f){
 }
 async function confirmarDevolucao(f){
   if(!canManage) return;
-  for(const item of f.itens){
-    if(!item.condDevolucao || !item.dataDevolucao){ showToast(`Preencha condição e data de devolução de todos os itens (faltando: ${item.nome}).`); return; }
+  const ativos = f.itens.map((it,i)=>({it,i})).filter(x => itemComColab(x.it));
+  const alvo = (typeof devAlvo === 'number' && ativos.length > 1) ? ativos.filter(x => x.i === devAlvo) : ativos;
+  if(!alvo.length){ devAlvo = 'todos'; renderFicha(); return; }
+  for(const {it: item} of alvo){
+    if(!item.condDevolucao || !item.dataDevolucao){ showToast(`Preencha condição e data de devolução (faltando: ${item.nome}).`); return; }
     if((item.condDevolucao === 'Regular' || item.condDevolucao === 'Ruim') && !item.obsDevolucao.trim()){ showToast(`Descreva o motivo da condição "${item.condDevolucao}" em: ${item.nome}.`); return; }
   }
   if(!canvasDevolucao || canvasDevolucao._isEmpty()){ showToast('Colete a assinatura do colaborador antes de confirmar.'); return; }
-  f.assinaturaDevolucao = exportSignature(canvasDevolucao);
-  f.dataAssinaturaDevolucao = new Date().toISOString();
+  const assin = exportSignature(canvasDevolucao);
+  const agora = new Date().toISOString();
+  const parcial = alvo.length < ativos.length;
+  f.devolucoes = (f.devolucoes || []).concat([{data: agora, por: myId || null, assinatura: assin, itens: alvo.map(x => ({nome: x.it.nome, patrimonio: x.it.patrimonio}))}]);
+  if(parcial){
+    await syncInventarioNaDevolucao(f, alvo.map(x => x.it));
+    alvo.forEach(x => { x.it.devolvidoParcial = true; });
+    await persistFichaNow(f);
+    devAlvo = 'todos';
+    showToast(`Devolvido: ${alvo.map(x => (x.it.patrimonio ? x.it.patrimonio + ' ' : '') + x.it.nome).join(', ')}. A ficha continua em aberto com os outros itens.`);
+    renderTopActionsFicha(); renderFicha();
+    return;
+  }
+  f.assinaturaDevolucao = assin;
+  f.dataAssinaturaDevolucao = agora;
   f.status = 'concluida';
   await persistFichaNow(f);
   await syncInventarioNaDevolucao(f);
+  devAlvo = 'todos';
   showToast('Devolução registrada com sucesso.');
-  renderFicha();
+  renderTopActionsFicha(); renderFicha();
 }
 
 /* ============================================================
