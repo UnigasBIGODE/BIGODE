@@ -499,6 +499,10 @@ function linhasInvDe(lista){
   return [...lista].sort((a,b)=> (a.nome||'').localeCompare(b.nome||'')).map(i=>({
     'Nome / descrição': i.nome || '',
     'Patrimônio': i.patrimonio || '',
+    'Setor': i.setor || '',
+    'Fabricante': i.fabricante || '',
+    'Modelo': i.modelo || '',
+    'Alocado a': (i.alocadoA && (i.quantidadeAlocada||0) > 0) ? i.alocadoA : '',
     'Quantidade total': i.quantidade || 1,
     'Alocado': i.quantidadeAlocada || 0,
     'Em manutenção': i.quantidadeManutencao || 0,
@@ -1138,7 +1142,7 @@ function renderUnidadeCard(u){
       <div><b>Patrimônio ${escapeHtml(u.patrimonio)}</b> <span class="pill ${p.cls}">${escapeHtml(situacaoTexto(u))}</span> <span class="pill ${u.posse}">${u.posse === 'locado' ? 'Locado' : 'Próprio'}</span> ${locacaoBadge(u)}</div>
       <label class="sel-inline">${selBox('inv', u.id)} incluir na exportação</label>
     </div>
-    <div class="lr-meta">${locacaoLinha(u)}${u.atualizadoEm ? `<span>Última alteração: ${fmtDate(u.atualizadoEm)}${por}</span>` : ''}</div>
+    <div class="lr-meta">${u.setor ? `<span>Setor: ${escapeHtml(u.setor)}</span>` : ''}${(u.fabricante || u.modelo) ? `<span>${escapeHtml([u.fabricante, u.modelo].filter(Boolean).join(' · '))}</span>` : ''}${locacaoLinha(u)}${u.atualizadoEm ? `<span>Última alteração: ${fmtDate(u.atualizadoEm)}${por}</span>` : ''}</div>
     ${renderInvDetail(u)}
   </div>`;
 }
