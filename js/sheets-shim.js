@@ -9,108 +9,184 @@
   if(!URL_API || (window.claude && typeof window.claude.use === 'function')) return;
 
   const COLS = ['fichas','inventario','colaboradores'];
-  const LS = 'bigode:sheets:cred';
+  const LS = 'bigode:sheets:sessao';
   const cache = { fichas:{}, inventario:{}, colaboradores:{} };
   const listeners = {};
-  let cred = null, papel = 'consulta', lastV = -1, pendentes = 0, fila = Promise.resolve();
+  const NOME_PERFIL = { consulta:'Visualização', responsavel:'Gerenciador', admin:'Administrador' };
+  let sessao = null, lastV = -1, pendentes = 0, fila = Promise.resolve();
+  const podeEscrever = () => !!sessao && (sessao.perfil === 'responsavel' || sessao.perfil === 'admin');
 
   /* ---------- chamadas ao Apps Script ---------- */
   async function api(acao, extra){
     const r = await fetch(URL_API, {
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},   // evita "preflight" CORS
-      body: JSON.stringify(Object.assign({acao, codigo: cred && cred.codigo, matricula: cred && cred.matricula}, extra||{}))
+      body: JSON.stringify(Object.assign({acao, token: sessao && sessao.token}, extra||{}))
     });
     const j = await r.json();
-    if(!j.ok){ const e = new Error(j.erro || 'erro'); e.codigo = j.erro; throw e; }
+    if(!j.ok){
+      const e = new Error(j.erro || 'erro'); e.codigo = j.erro;
+      if(j.erro === 'sessao' && sessao){ sairComAviso('Sua sessão expirou ou foi encerrada. Entre novamente.'); }
+      throw e;
+    }
     return j;
   }
+  function guardar(){ try{ localStorage.setItem(LS, JSON.stringify(sessao)); }catch(e){} }
+  function sairComAviso(msg){ try{ localStorage.removeItem(LS); sessionStorage.setItem('bigode:aviso', msg); }catch(e){} location.reload(); }
 
-  /* ---------- tela de entrada: Visualização ou Gerenciador ---------- */
-  const NOME_PAPEL = { consulta: 'Visualização', responsavel: 'Gerenciador' };
-  function telaLogin(msg, modoInicial){
+  const MSG_ERRO = {
+    credenciais:'Matrícula ou senha incorretas.', bloqueado:'Muitas tentativas erradas. Aguarde 10 minutos e tente de novo.',
+    inativo:'Este usuário está desativado. Fale com o administrador.', senha_fraca:'A senha precisa ter 8 ou mais caracteres, com letras e números.',
+    senha_atual:'A senha atual não confere.', senha_igual:'A nova senha deve ser diferente da atual.', matricula_formato:'Matrícula no formato F0000000.',
+    ultimo_admin:'Precisa existir pelo menos um administrador ativo.', proprio:'Você não pode excluir o seu próprio usuário.',
+    somente_admin:'Só o administrador pode fazer isso.', somente_leitura:'Seu perfil é somente leitura.', nome:'Informe o nome.', perfil:'Escolha o perfil.',
+    sem_usuario:'Crie primeiro o seu usuário na tela Usuários.', nao_encontrado:'Usuário não encontrado.'
+  };
+  const msgErro = (e)=> MSG_ERRO[e && e.codigo] || 'Não foi possível conectar à planilha. Verifique a internet e o link do Apps Script.';
+
+  /* ---------- telas: entrada (duas colunas) e troca de senha ---------- */
+  const SVG_USER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/></svg>';
+  const SVG_LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+  const olho = '<button type="button" class="pw-eye" aria-label="Mostrar senha" title="Mostrar/ocultar senha">👁</button>';
+  function ligarOlhos(raiz){
+    raiz.querySelectorAll('.pw-eye').forEach(b=> b.addEventListener('click', ()=>{ const i = b.parentElement.querySelector('input'); i.type = i.type === 'password' ? 'text' : 'password'; }));
+  }
+  function telaLogin(msg){
     return new Promise(resolve=>{
-      let modo = modoInicial || 'consulta';
-      const ov = document.createElement('div');
-      ov.style.cssText = 'position:fixed;inset:0;z-index:1000;background:#fff;display:flex;align-items:center;justify-content:center;padding:16px;font-family:Inter,system-ui,sans-serif;overflow:auto;';
+      const ov = document.createElement('div'); ov.className = 'login';
+      const barras = [38,52,44,68,57,74,63,82].map((h,i)=>`<span style="height:${h}%;animation-delay:${400+i*70}ms"></span>`).join('');
       ov.innerHTML = `
-        <form style="width:100%;max-width:400px;border:1px solid #E5E5E5;border-radius:14px;padding:26px 22px;box-shadow:0 8px 30px rgba(0,0,0,.08);">
-          <img src="assets/logo-unigas.jpg" alt="Unigás" style="height:46px;display:block;margin:0 auto 14px;">
-          <div style="text-align:center;font-weight:800;font-size:18px;color:#E30613;">B.I.G.O.D.E</div>
-          <div style="text-align:center;font-size:12px;color:#666;margin:2px 0 16px;">Base Integrada de Gestão Operacional De Equipamentos</div>
-          <div style="font-size:12px;font-weight:600;color:#333;margin-bottom:6px;">Como você vai entrar?</div>
-          <div id="bg-modos" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
-            <button type="button" data-m="consulta" style="text-align:left;padding:10px;border-radius:10px;cursor:pointer;font-family:inherit;">
-              <div style="font-weight:700;font-size:13px;">Visualização</div>
-              <div style="font-size:11px;margin-top:2px;opacity:.8;">Só consulta e exporta Excel</div></button>
-            <button type="button" data-m="responsavel" style="text-align:left;padding:10px;border-radius:10px;cursor:pointer;font-family:inherit;">
-              <div style="font-weight:700;font-size:13px;">Gerenciador</div>
-              <div style="font-size:11px;margin-top:2px;opacity:.8;">Cadastra, edita e exclui tudo</div></button>
+        <aside class="login-brand">
+          <div class="blob b1"></div><div class="blob b2"></div><div class="dots"></div>
+          <img class="logo" src="assets/logo-unigas.jpg" alt="Unigás">
+          <div>
+            <div class="eyebrow">B.I.G.O.D.E</div>
+            <h2>Cada ferramenta no lugar, cada responsável identificado.</h2>
+            <p class="lead">Controle fichas de retirada e devolução, inventário, locações e manutenções em um só lugar, com histórico de tudo.</p>
+            <div class="mini-cards">
+              <div class="mini-card"><div class="t">Devoluções em dia</div><div class="bars">${barras}</div></div>
+              <div class="mini-stack">
+                <div class="mini-card"><div class="t">Ferramentas controladas</div><div class="n">100%</div></div>
+                <div class="mini-alert"><span class="ping"><i></i><i></i></span>Alertas de vencimento</div>
+              </div>
+            </div>
           </div>
-          <label style="font-size:12px;font-weight:600;color:#333;">Matrícula</label>
-          <input id="bg-mat" required maxlength="8" placeholder="F0000000" autocapitalize="characters" autocomplete="username" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccc;border-radius:8px;margin:4px 0 12px;font-size:14px;">
-          <label style="font-size:12px;font-weight:600;color:#333;">Código de acesso <span id="bg-modo-txt"></span></label>
-          <input id="bg-cod" type="password" required style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccc;border-radius:8px;margin:4px 0 8px;font-size:14px;">
-          <div id="bg-msg" style="min-height:18px;font-size:12px;color:#B00020;margin-bottom:8px;">${msg||''}</div>
-          <button style="width:100%;padding:11px;border:0;border-radius:8px;background:#E30613;color:#fff;font-weight:700;font-size:14px;cursor:pointer;">Entrar</button>
-        </form>`;
+          <div class="copy">© ${new Date().getFullYear()} Unigás – Sistemas de Aquecimento</div>
+        </aside>
+        <main class="login-form-side">
+          <div style="width:100%;max-width:420px;">
+            <form class="login-card" novalidate>
+              <img class="logo-m" src="assets/logo-unigas.jpg" alt="Unigás">
+              <h1>Entrar</h1>
+              <p class="sub">Bem-vindo(a) de volta. Use sua matrícula e senha.</p>
+              <div class="field"><label for="lg-mat">Matrícula</label>
+                <div class="ic">${SVG_USER}<input id="lg-mat" maxlength="9" placeholder="F0000000" autocapitalize="characters" autocomplete="username" autofocus></div></div>
+              <div class="field"><label for="lg-senha">Senha</label>
+                <div class="ic pw-wrap">${SVG_LOCK}<input id="lg-senha" type="password" autocomplete="current-password">${olho}</div></div>
+              <div id="lg-erro" class="erro" style="${msg ? '' : 'display:none'}">${msg || ''}</div>
+              <button class="go" type="submit">Entrar</button>
+              <button class="esq" type="button" id="lg-esq">Esqueci minha senha</button>
+            </form>
+            <p class="login-note">B.I.G.O.D.E · Unigás</p>
+          </div>
+        </main>`;
       document.body.appendChild(ov);
-      const pintar = ()=>{
-        ov.querySelectorAll('#bg-modos button').forEach(bt=>{
-          const on = bt.dataset.m === modo;
-          bt.style.border = on ? '2px solid #E30613' : '1px solid #ccc';
-          bt.style.background = on ? '#FFF1F2' : '#fff';
-          bt.style.color = '#1B1B1B';
-        });
-        ov.querySelector('#bg-modo-txt').textContent = '(' + NOME_PAPEL[modo] + ')';
-      };
-      pintar();
-      ov.querySelectorAll('#bg-modos button').forEach(bt=> bt.addEventListener('click', ()=>{ modo = bt.dataset.m; pintar(); }));
-      try{ const old = JSON.parse(localStorage.getItem(LS)||'null'); if(old) ov.querySelector('#bg-mat').value = old.matricula || ''; }catch(e){}
-      ov.querySelector('form').addEventListener('submit', ev=>{
+      ligarOlhos(ov);
+      const card = ov.querySelector('.login-card'), erro = ov.querySelector('#lg-erro'), go = ov.querySelector('.go');
+      const mostrar = (t)=>{ erro.style.display = t ? '' : 'none'; erro.textContent = t || ''; if(t){ card.classList.remove('tremer'); void card.offsetWidth; card.classList.add('tremer'); } };
+      try{ const old = localStorage.getItem('bigode:ultima-mat'); if(old) ov.querySelector('#lg-mat').value = old; }catch(e){}
+      ov.querySelector('#lg-esq').addEventListener('click', ()=> mostrar('Para redefinir a senha, procure o administrador do sistema — ele define uma senha provisória para você.'));
+      card.addEventListener('submit', async ev=>{
         ev.preventDefault();
-        const matricula = ov.querySelector('#bg-mat').value.replace(/\s/g, '').toUpperCase();
-        const codigo = ov.querySelector('#bg-cod').value.trim();
-        if(!/^F\d{7}$/.test(matricula)){ ov.querySelector('#bg-msg').textContent = 'Digite a matrícula no formato F0000000 (letra F + 7 números).'; return; }
-        ov.remove(); resolve({matricula, codigo, modo});
+        const matricula = ov.querySelector('#lg-mat').value.replace(/\s/g,'').toUpperCase();
+        const senha = ov.querySelector('#lg-senha').value;
+        if(!/^F\d{7,8}$/.test(matricula)){ mostrar('Digite a matrícula no formato F0000000 (letra F + 7 números).'); return; }
+        if(!senha){ mostrar('Digite a senha.'); return; }
+        go.disabled = true; go.textContent = 'Entrando…'; mostrar('');
+        try{
+          const r = await fetch(URL_API, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({acao:'login', matricula, senha}) }).then(x=>x.json());
+          if(!r.ok){ const e = new Error(r.erro); e.codigo = r.erro; throw e; }
+          try{ localStorage.setItem('bigode:ultima-mat', matricula); }catch(e){}
+          go.classList.add('ok'); go.textContent = '✓ Bem-vindo(a)!';
+          setTimeout(()=>{ ov.remove(); resolve({ r, senha }); }, 700);
+        }catch(e){
+          go.disabled = false; go.textContent = 'Entrar'; mostrar(msgErro(e));
+        }
       });
     });
   }
 
-  async function entrar(){
-    let msg = '', modoAnterior = null;
-    try{ cred = JSON.parse(localStorage.getItem(LS)||'null'); }catch(e){ cred = null; }
-    for(;;){
-      if(cred && cred.codigo && cred.matricula){
-        try{
-          const r = await api('auth');
-          if(cred.modo && r.papel !== cred.modo){
-            msg = 'Este código é de ' + NOME_PAPEL[r.papel] + ', não de ' + NOME_PAPEL[cred.modo] + '. Escolha a opção correta.';
-            modoAnterior = r.papel; throw Object.assign(new Error('modo'), {codigo:'modo'});
-          }
-          papel = r.papel; lastV = r.v; cred.nome = r.nome || cred.matricula; localStorage.setItem(LS, JSON.stringify(cred)); return true;
-        }catch(e){
-          if(e.codigo === 'codigo') msg = 'Código incorreto.';
-          else if(e.codigo === 'matricula') msg = 'Matrícula não encontrada. Confira o formato F0000000 e se você está na lista de colaboradores.';
-          else if(e.codigo !== 'modo') msg = 'Não foi possível conectar à planilha. Verifique a internet e o link do Apps Script.';
-          if(!modoAnterior && cred) modoAnterior = cred.modo;
-          try{ localStorage.removeItem(LS); }catch(_){}
-        }
-      }
-      cred = await telaLogin(msg, modoAnterior);
-    }
+  /* Troca de senha obrigatória (primeiro acesso ou senha redefinida pelo administrador) */
+  function telaTrocaObrigatoria(senhaAtual){
+    return new Promise(resolve=>{
+      const ov = document.createElement('div'); ov.className = 'login';
+      ov.style.gridTemplateColumns = '1fr';
+      ov.innerHTML = `<main class="login-form-side"><form class="login-card" novalidate>
+          <img class="logo-m" style="display:block" src="assets/logo-unigas.jpg" alt="Unigás">
+          <h1>Crie sua senha</h1>
+          <p class="sub">Por segurança, troque a senha provisória por uma só sua.</p>
+          <div class="field"><label>Nova senha</label><div class="ic pw-wrap">${SVG_LOCK}<input id="tn-nova" type="password" autocomplete="new-password">${olho}</div></div>
+          <div class="field"><label>Repita a nova senha</label><div class="ic pw-wrap">${SVG_LOCK}<input id="tn-conf" type="password" autocomplete="new-password">${olho}</div></div>
+          <div class="hint" style="margin:-4px 0 12px;">Mínimo de 8 caracteres, com letras e números.</div>
+          <div id="tn-erro" class="erro" style="display:none"></div>
+          <button class="go" type="submit">Salvar e entrar</button>
+        </form></main>`;
+      document.body.appendChild(ov); ligarOlhos(ov);
+      const erro = ov.querySelector('#tn-erro'), go = ov.querySelector('.go');
+      const mostrar = t=>{ erro.style.display = t ? '' : 'none'; erro.textContent = t || ''; };
+      ov.querySelector('form').addEventListener('submit', async ev=>{
+        ev.preventDefault();
+        const nova = ov.querySelector('#tn-nova').value, conf = ov.querySelector('#tn-conf').value;
+        if(nova !== conf){ mostrar('As duas senhas não são iguais.'); return; }
+        go.disabled = true; mostrar('');
+        try{ await trocarSenha(senhaAtual, nova); ov.remove(); resolve(); }
+        catch(e){ go.disabled = false; mostrar(msgErro(e)); }
+      });
+    });
   }
 
-  /* Botão fixo "Sair" com o nome e o perfil de quem está usando */
-  function chipUsuario(){
-    const c = document.createElement('div');
-    c.style.cssText = 'position:fixed;right:8px;bottom:30px;z-index:101;background:#fff;border:1px solid #E5E5E5;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.12);padding:5px 6px 5px 12px;font:600 11.5px Inter,system-ui,sans-serif;color:#333;display:flex;gap:8px;align-items:center;';
-    const t = document.createElement('span'); t.textContent = cred.nome + ' · ' + NOME_PAPEL[papel];
-    const b = document.createElement('button'); b.textContent = 'Sair';
-    b.style.cssText = 'border:0;border-radius:999px;background:#E30613;color:#fff;font:700 11px Inter,system-ui,sans-serif;padding:4px 10px;cursor:pointer;';
-    b.addEventListener('click', ()=> window.bigodeSair());
-    c.append(t, b); document.body.appendChild(c);
+  async function trocarSenha(atual, nova){
+    const r = await api('conta.senha', { atual, nova });
+    sessao.token = r.token; sessao.trocar = false; guardar();
+    return true;
   }
+
+  async function entrar(){
+    let aviso = '';
+    try{ aviso = sessionStorage.getItem('bigode:aviso') || ''; sessionStorage.removeItem('bigode:aviso'); }catch(e){}
+    try{ sessao = JSON.parse(localStorage.getItem(LS) || 'null'); }catch(e){ sessao = null; }
+    if(sessao && sessao.token){
+      try{
+        const r = await api('auth');
+        sessao = { token:r.token, matricula:r.matricula, nome:r.nome, perfil:r.perfil, boot:r.boot, trocar:false }; lastV = r.v; guardar();
+        return;
+      }catch(e){
+        if(e.codigo !== 'sessao'){ aviso = msgErro(e); }
+        sessao = null; try{ localStorage.removeItem(LS); }catch(_){}
+      }
+    }
+    const { r, senha } = await telaLogin(aviso);
+    sessao = { token:r.token, matricula:r.matricula, nome:r.nome, perfil:r.perfil, boot:r.boot, trocar:r.trocar }; lastV = r.v; guardar();
+    if(r.trocar) await telaTrocaObrigatoria(senha);
+  }
+
+  /* API de contas usada pela aplicação (menu, tela Usuários e Minha conta) */
+  window.bigodeAuth = {
+    get perfil(){ return sessao && sessao.perfil; }, get nome(){ return sessao && sessao.nome; },
+    get matricula(){ return sessao && sessao.matricula; }, get boot(){ return !!(sessao && sessao.boot); },
+    nomePerfil: p => NOME_PERFIL[p || (sessao && sessao.perfil)] || '',
+    msgErro,
+    trocarSenha,
+    listarUsuarios: async ()=> (await api('usuarios.listar')).usuarios,
+    salvarUsuario: async (u)=>{
+      const r = await api('usuarios.salvar', u);
+      if(r.token && sessao){ sessao.token = r.token; sessao.boot = false; sessao.perfil = 'admin'; guardar(); }
+      return r.usuario;
+    },
+    removerUsuario: async (matricula)=> { await api('usuarios.remover', { matricula }); },
+    sair(){ try{ localStorage.removeItem(LS); }catch(e){} location.reload(); }
+  };
+  window.bigodeSair = ()=> window.bigodeAuth.sair();
 
   /* ---------- cache e avisos às telas ---------- */
   function snapshot(col, order){
@@ -174,16 +250,23 @@
           setTimeout(()=> cb(snapshot(col, l.order)), 0);
           return ()=>{ listeners[col] = listeners[col].filter(x => x !== l); };
         },
+        async setMany(lista){
+          if(!podeEscrever()) throw new Error('somente leitura');
+          const docs = lista.map(x => ({ id: x.id, doc: JSON.parse(JSON.stringify(x.doc)) }));
+          docs.forEach(x => { cache[col][x.id] = x.doc; });
+          setTimeout(()=> notify(col), 0);
+          await gravarRemoto('setmany', { col, docs });
+        },
         doc(id){
           return {
             async set(body){
-              if(papel !== 'responsavel') throw new Error('somente leitura');
+              if(!podeEscrever()) throw new Error('somente leitura');
               const doc = JSON.parse(JSON.stringify(body));
               cache[col][id] = doc; setTimeout(()=> notify(col), 0);
               await gravarRemoto('set', { col, id, doc });
             },
             async delete(){
-              if(papel !== 'responsavel') throw new Error('somente leitura');
+              if(!podeEscrever()) throw new Error('somente leitura');
               delete cache[col][id]; setTimeout(()=> notify(col), 0);
               await gravarRemoto('del', { col, id });
             }
@@ -195,9 +278,10 @@
   };
 
   const user = {
-    async canEdit(){ return papel === 'responsavel'; },
-    async isOwner(){ return papel === 'responsavel'; },
-    async id(){ return (cred && cred.nome) || 'usuario'; },
+    async canEdit(){ return podeEscrever(); },
+    async isOwner(){ return podeEscrever(); },
+    async isAdmin(){ return !!sessao && sessao.perfil === 'admin'; },
+    async id(){ return (sessao && sessao.nome) || 'usuario'; },
     async profiles(ids){ const out = {}; [].concat(ids).forEach(id => { out[id] = { id, name: id }; }); return out; }
   };
 
@@ -216,11 +300,10 @@
   let pronto = null;
   async function iniciar(){
     await entrar();
-    chipUsuario();
     await carregarTudo();
     // Primeira vez com a planilha vazia: envia os 258 colaboradores iniciais
     const seed = (window.BIGODE_SEED || {}).colaboradores;
-    if(papel === 'responsavel' && seed && !Object.keys(cache.colaboradores).length){
+    if(podeEscrever() && seed && !Object.keys(cache.colaboradores).length){
       const docs = seed.map(d => { const c = Object.assign({}, d); delete c.id; return { id: d.id, doc: c }; });
       docs.forEach(x => { cache.colaboradores[x.id] = x.doc; });
       notify('colaboradores');
@@ -240,5 +323,4 @@
     return ({ db, user, downloads })[name] || null;
   }};
 
-  window.bigodeSair = function(){ try{ localStorage.removeItem(LS); }catch(e){} location.reload(); };
 })();

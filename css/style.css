@@ -44,7 +44,7 @@
   .brand{display:flex; align-items:center; gap:14px;}
   .brand img.logo{height:52px; width:auto; display:block;}
   .brand-text h1{
-    font-family:'Barlow Condensed', sans-serif;
+    font-family:'Inter', sans-serif;
     font-weight:700; font-size:clamp(20px,4vw,27px);
     margin:0; line-height:1.05; color:var(--ink);
   }
@@ -80,7 +80,7 @@
   .chip.active{background:var(--ink); border-color:var(--ink); color:#fff;}
 
   .empty{text-align:center; padding:60px 20px; border:1.5px dashed var(--line-strong); border-radius:6px; color:var(--ink-soft); background:rgba(255,255,255,.5);}
-  .empty b{color:var(--ink); display:block; font-size:17px; margin-bottom:6px; font-family:'Barlow Condensed',sans-serif; font-weight:600;}
+  .empty b{color:var(--ink); display:block; font-size:17px; margin-bottom:6px; font-family:'Inter',sans-serif; font-weight:600;}
 
   .ficha-list{display:flex; flex-direction:column; gap:10px;}
   .ficha-row{
@@ -95,11 +95,11 @@
   .fr-main .fr-meta{color:var(--ink-soft); font-size:12.5px; margin-top:3px;}
   .fr-meta span + span::before{content:"·"; margin:0 6px; color:var(--line-strong);}
   .fr-right{display:flex; align-items:center; gap:10px;}
-  .status-badge{font-family:'Barlow Condensed', sans-serif; font-weight:600; font-size:12px; letter-spacing:.4px; padding:4px 10px; border-radius:3px;}
+  .status-badge{font-family:'Inter', sans-serif; font-weight:600; font-size:12px; letter-spacing:.4px; padding:4px 10px; border-radius:3px;}
   .status-badge.aberta{background:var(--regular-bg); color:var(--regular);}
   .status-badge.concluida{background:var(--good-bg); color:var(--good);}
   .funcao-badge{
-    font-family:'Barlow Condensed', sans-serif; font-weight:600; font-size:11.5px; letter-spacing:.3px;
+    font-family:'Inter', sans-serif; font-weight:600; font-size:11.5px; letter-spacing:.3px;
     background:var(--brand-tint); color:var(--brand-dark); padding:3px 9px; border-radius:3px;
     display:inline-block;
   }
@@ -113,7 +113,7 @@
   }
   .funcao-card:hover{border-color:var(--brand); transform:translateY(-1px);}
   .funcao-card .fc-name{
-    font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:18px; color:var(--ink);
+    font-family:'Inter', sans-serif; font-weight:700; font-size:18px; color:var(--ink);
     display:flex; align-items:center; justify-content:space-between; gap:8px;
   }
   .funcao-card .fc-count{font-size:12px; color:var(--ink-soft); margin-top:4px;}
@@ -123,7 +123,7 @@
   /* ---------- CARD / SECTIONS ---------- */
   .card{background:var(--card); border:1.5px solid var(--line); border-radius:5px; padding:22px; margin-bottom:18px;}
   .card h2{
-    font-family:'Barlow Condensed', sans-serif; font-size:19px; font-weight:600; margin:0 0 16px;
+    font-family:'Inter', sans-serif; font-size:19px; font-weight:600; margin:0 0 16px;
     padding-bottom:10px; border-bottom:1.5px solid var(--line); display:flex; align-items:center; gap:8px;
   }
   .step-num{
@@ -142,7 +142,7 @@
   .field{margin-bottom:14px;}
   .funcao-readonly{
     display:inline-flex; align-items:center; gap:6px; background:var(--brand-tint); color:var(--brand-dark);
-    padding:8px 12px; border-radius:3px; font-weight:700; font-size:14.5px; font-family:'Barlow Condensed',sans-serif;
+    padding:8px 12px; border-radius:3px; font-weight:700; font-size:14.5px; font-family:'Inter',sans-serif;
   }
 
   /* equipment items */
@@ -210,7 +210,7 @@
   .sig-saved-img{width:100%; max-height:150px; object-fit:contain; background:#fff; border:1px solid var(--line); border-radius:3px;}
   .signed-block{display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
   .signed-meta{font-size:12.5px; color:var(--ink-soft);}
-  .signed-meta b{color:var(--good); display:block; font-size:13.5px; font-family:'Barlow Condensed',sans-serif; letter-spacing:.3px;}
+  .signed-meta b{color:var(--good); display:block; font-size:13.5px; font-family:'Inter',sans-serif; letter-spacing:.3px;}
 
   .bottom-bar{
     position:sticky; bottom:0; background:linear-gradient(to top, var(--paper) 65%, transparent);
@@ -232,7 +232,7 @@
 
   .confirm-overlay{position:fixed; inset:0; background:rgba(20,24,30,.55); display:flex; align-items:center; justify-content:center; padding:20px; z-index:60;}
   .confirm-box{background:#fff; border-radius:6px; padding:22px; max-width:380px; width:100%; border:1.5px solid var(--ink);}
-  .confirm-box h3{margin:0 0 8px; font-family:'Barlow Condensed',sans-serif; font-size:19px;}
+  .confirm-box h3{margin:0 0 8px; font-family:'Inter',sans-serif; font-size:19px;}
   .confirm-box p{margin:0 0 18px; font-size:14px; color:var(--ink-soft); line-height:1.5;}
   .confirm-actions{display:flex; justify-content:flex-end; gap:8px;}
 
@@ -257,7 +257,7 @@
   .section-tab{
     border:1.5px solid var(--line-strong); background:var(--card); color:var(--ink-soft);
     padding:8px 16px; border-radius:20px; font-size:13px; font-weight:700; cursor:pointer;
-    font-family:'Barlow Condensed',sans-serif; letter-spacing:.3px;
+    font-family:'Inter',sans-serif; letter-spacing:.3px;
   }
   .section-tab.active{background:var(--ink); border-color:var(--ink); color:#fff;}
 
@@ -267,14 +267,14 @@
   .chart-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px;}
   @media (max-width:720px){.chart-grid{grid-template-columns:1fr;}}
   .chart-card{background:var(--card); border:1.5px solid var(--line); border-radius:5px; padding:16px;}
-  .chart-card h3{font-family:'Barlow Condensed',sans-serif; font-size:15px; font-weight:600; margin:0 0 12px;}
+  .chart-card h3{font-family:'Inter',sans-serif; font-size:15px; font-weight:600; margin:0 0 12px;}
   .bar-row{display:flex; align-items:center; gap:10px; margin-bottom:9px; font-size:12.5px;}
   .bar-row .bar-label{width:92px; flex-shrink:0; color:var(--ink-soft);}
   .bar-row .bar-track{flex:1; background:var(--paper); border:1px solid var(--line); border-radius:4px; height:16px; overflow:hidden;}
   .bar-row .bar-fill{height:100%; border-radius:3px 0 0 3px; transition:width .3s ease;}
   .bar-row .bar-count{width:26px; text-align:right; font-weight:700; flex-shrink:0;}
   .stat-card{background:var(--card); border:1.5px solid var(--line); border-radius:5px; padding:14px 16px;}
-  .stat-card .stat-num{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:26px; line-height:1;}
+  .stat-card .stat-num{font-family:'Inter',sans-serif; font-weight:700; font-size:26px; line-height:1;}
   .stat-card .stat-label{font-size:11.5px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.3px; margin-top:5px;}
   .stat-card.alert{border-left:4px solid var(--ruim);}
   .stat-card.ok{border-left:4px solid var(--good);}
@@ -305,7 +305,7 @@
   .list-row.situacao-alocado{border-left-color:var(--regular);}
   .list-row.situacao-manutencao{border-left-color:var(--ruim);}
   .list-row.situacao-baixado{border-left-color:var(--line-strong); opacity:.6;}
-  .pill{font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:11.5px; letter-spacing:.3px; padding:3px 9px; border-radius:12px; display:inline-block;}
+  .pill{font-family:'Inter',sans-serif; font-weight:600; font-size:11.5px; letter-spacing:.3px; padding:3px 9px; border-radius:12px; display:inline-block;}
   .pill.disponivel{background:var(--good-bg); color:var(--good);}
   .pill.alocado{background:var(--regular-bg); color:var(--regular);}
   .pill.manutencao{background:var(--ruim-bg); color:var(--ruim);}
@@ -340,9 +340,9 @@
   .inv-stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(125px,1fr)); gap:8px; margin-bottom:12px;}
   .inv-stat{background:var(--paper); border:1px solid var(--line); border-radius:4px; padding:8px 10px;}
   .inv-stat span{display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; color:var(--ink-soft);}
-  .inv-stat b{font-family:'Barlow Condensed',sans-serif; font-size:17px; color:var(--ink);}
+  .inv-stat b{font-family:'Inter',sans-serif; font-size:17px; color:var(--ink);}
   .inv-stat.total{border-color:var(--brand); background:var(--brand-tint);}
-  .sec-title{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:14.5px; color:var(--ink); margin:12px 0 4px;}
+  .sec-title{font-family:'Inter',sans-serif; font-weight:700; font-size:14.5px; color:var(--ink); margin:12px 0 4px;}
   .per-row{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; padding:7px 0; border-bottom:1px solid var(--line); font-size:12.5px; color:var(--ink-soft);}
   .per-row b{color:var(--ink);}
   .per-row.gap{color:var(--regular); background:var(--regular-bg); padding:6px 8px; border-radius:3px; margin:3px 0; border-bottom:none;}

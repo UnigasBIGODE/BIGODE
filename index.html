@@ -8,27 +8,41 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/tema.css">
 </head>
 <body>
-<div class="wrap">
-
-  <header class="top">
-    <div class="brand">
+<div class="shell">
+  <div class="side-backdrop" id="side-backdrop"></div>
+  <aside class="side" id="side">
+    <div class="side-brand">
       <img class="logo" src="assets/logo-unigas.jpg" alt="Unigás - Sistemas de Aquecimento">
       <div class="brand-text">
         <h1>B.I.G.O.D.E</h1>
-        <div class="subtitle">Base Integrada de Gestão Operacional De Equipamentos</div>
+        <div class="subtitle">Gestão Operacional de Equipamentos</div>
       </div>
     </div>
-    <div class="top-actions" id="top-actions"></div>
-  </header>
+    <nav class="side-nav" id="section-tabs">
+      <div class="nav-label">Menu</div>
+      <button type="button" class="section-tab" data-sec="fichas"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg><span>Fichas</span></button>
+      <button type="button" class="section-tab" data-sec="inventario"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg><span>Inventário</span></button>
+      <button type="button" class="section-tab" data-sec="manutencoes"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><span>Manutenções</span></button>
+      <button type="button" class="section-tab" data-sec="colaboradores"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .6 3.2 2.2 3.5 4.7"/></svg><span>Colaboradores</span></button>
+      <div class="nav-label admin-only hidden">Administração</div>
+      <button type="button" class="section-tab admin-only hidden" data-sec="usuarios"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.2 8 8 9 4.8-1 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg><span>Usuários e senhas</span></button>
+      <div class="nav-label">Conta</div>
+      <button type="button" class="section-tab" data-sec="conta"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/></svg><span>Minha conta</span></button>
+    </nav>
+    <div class="side-user" id="side-user"></div>
+  </aside>
 
-  <div class="section-tabs" id="section-tabs">
-    <button type="button" class="section-tab" data-sec="fichas">Fichas</button>
-    <button type="button" class="section-tab" data-sec="inventario">Inventário</button>
-    <button type="button" class="section-tab" data-sec="colaboradores">Colaboradores</button>
-    <button type="button" class="btn btn-ghost btn-sm hidden" id="btn-export-excel" style="margin-left:auto;">⬇ Exportar Excel</button>
-  </div>
+  <div class="main">
+    <header class="top">
+      <button type="button" class="menu-btn" id="menu-btn" aria-label="Abrir menu"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <div class="page-title" id="page-title">Fichas</div>
+      <div class="top-actions" id="top-actions"></div>
+      <button type="button" class="btn btn-ghost btn-sm hidden" id="btn-export-excel">⬇ Exportar Excel</button>
+    </header>
+    <div class="wrap">
 
   <!-- ================= DASHBOARD / FICHAS ================= -->
   <section id="view-dashboard" class="hidden">
@@ -62,9 +76,10 @@
     </div>
     <div class="inline-form-toggle">
       <button class="btn btn-primary btn-sm" id="btn-toggle-inv-form">+ Novo item de inventário</button>
+      <button class="btn btn-ghost btn-sm hidden" id="btn-conferir-aloc" title="Encontra ferramentas que constam como alocadas mas já foram devolvidas">Conferir alocações</button>
     </div>
     <div class="inline-form hidden" id="inv-new-form">
-      <h3 id="inv-form-title" style="font-family:'Barlow Condensed',sans-serif; font-size:17px; margin:0 0 12px;">Novo item de inventário</h3>
+      <h3 id="inv-form-title" style="font-family:'Inter',sans-serif; font-size:17px; margin:0 0 12px;">Novo item de inventário</h3>
       <div class="field-grid">
         <div class="field">
           <label>Nome / descrição da ferramenta</label>
@@ -75,6 +90,10 @@
           <textarea id="inv-f-patrimonios" rows="3" placeholder="FUR-001&#10;FUR-002&#10;FUR-003"></textarea>
           <div class="locked-note" id="inv-f-pat-hint" style="margin-top:4px;"></div>
         </div>
+      </div>
+      <div class="field" style="max-width:320px;">
+        <label for="inv-f-venc-manut">Vencimento da manutenção (próxima manutenção até)</label>
+        <input type="date" id="inv-f-venc-manut">
       </div>
       <div class="field">
         <label>Posse</label>
@@ -126,7 +145,7 @@
       <button class="btn btn-primary btn-sm" id="btn-toggle-colab-form">+ Novo colaborador</button>
     </div>
     <div class="inline-form hidden" id="colab-new-form">
-      <h3 id="colab-form-title" style="font-family:'Barlow Condensed',sans-serif; font-size:17px; margin:0 0 12px;">Novo colaborador</h3>
+      <h3 id="colab-form-title" style="font-family:'Inter',sans-serif; font-size:17px; margin:0 0 12px;">Novo colaborador</h3>
       <div class="field-grid">
         <div class="field">
           <label>Nome completo</label>
@@ -231,6 +250,50 @@
     <div class="bottom-bar" id="bottom-bar"></div>
   </section>
 
+  <!-- ================= MANUTENÇÕES ================= -->
+  <section id="view-manutencoes" class="hidden">
+    <div class="stat-grid" id="man-stats"></div>
+    <div class="filters" id="man-tabs" style="margin-bottom:12px;"></div>
+    <div class="dash-toolbar">
+      <input type="text" class="search" id="man-busca" placeholder="Buscar por ferramenta, patrimônio, oficina ou motivo...">
+      <div id="man-filtros" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+    </div>
+    <div id="man-conteudo" class="row-list"></div>
+  </section>
+
+  <!-- ================= USUÁRIOS (administrador) ================= -->
+  <section id="view-usuarios" class="hidden">
+    <div class="dash-toolbar">
+      <input type="text" class="search" id="usr-search" placeholder="Buscar por nome ou matrícula...">
+      <button class="btn btn-primary btn-sm" id="btn-novo-usuario">+ Novo usuário</button>
+    </div>
+    <p class="intro-note" style="margin-top:0;">Aqui você escolhe quem pode entrar no sistema, qual perfil cada pessoa tem e define ou redefine senhas.</p>
+    <div id="usr-list" class="row-list"></div>
+  </section>
+
+  <!-- ================= MINHA CONTA ================= -->
+  <section id="view-conta" class="hidden">
+    <div class="card">
+      <h2>Meus dados</h2>
+      <div id="conta-dados"></div>
+    </div>
+    <div class="card" id="conta-senha-card">
+      <h2>Trocar minha senha</h2>
+      <form id="form-senha" class="stack" autocomplete="off">
+        <div class="field"><label for="cs-atual">Senha atual</label><input type="password" id="cs-atual" autocomplete="current-password" required></div>
+        <div class="field-grid">
+          <div class="field"><label for="cs-nova">Nova senha</label><input type="password" id="cs-nova" autocomplete="new-password" required></div>
+          <div class="field"><label for="cs-conf">Repita a nova senha</label><input type="password" id="cs-conf" autocomplete="new-password" required></div>
+        </div>
+        <div class="hint">Mínimo de 8 caracteres, com letras e números.</div>
+        <div id="cs-msg" class="form-msg"></div>
+        <div><button class="btn btn-primary" type="submit">Salvar nova senha</button></div>
+      </form>
+    </div>
+  </section>
+
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>

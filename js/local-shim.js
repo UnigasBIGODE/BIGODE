@@ -59,6 +59,7 @@
           setTimeout(()=> cb(snapshot(col, l.order)), 0);
           return ()=>{ listeners[col] = listeners[col].filter(x => x !== l); };
         },
+        async setMany(lista){ const o = read(col) || {}; lista.forEach(x => { o[x.id] = JSON.parse(JSON.stringify(x.doc)); }); write(col, o); setTimeout(()=> notify(col), 0); },
         doc(id){
           return {
             async set(body){ const o = read(col) || {}; o[id] = JSON.parse(JSON.stringify(body)); write(col, o); setTimeout(()=> notify(col), 0); },
@@ -76,11 +77,39 @@
     if(e.key && e.key.indexOf(PREFIX) === 0) notify(e.key.slice(PREFIX.length));
   });
 
+  /* Perfil no modo local: padrão Administrador. Para testar os outros: index.html?perfil=consulta ou ?perfil=responsavel */
+  const PERFIL = (/[?&]perfil=(consulta|responsavel|admin)/.exec(location.search) || [])[1] || 'admin';
+  const NOME_PERFIL = { consulta:'Visualização', responsavel:'Gerenciador', admin:'Administrador' };
+  const podeEscrever = PERFIL !== 'consulta';
+  const LSU = 'bigode:usuarios';
+  const lerU = ()=>{ try{ return JSON.parse(localStorage.getItem(LSU)) || []; }catch(e){ return []; } };
+  const gravarU = l => localStorage.setItem(LSU, JSON.stringify(l));
+  if(!lerU().length) gravarU([{ matricula:'F0000001', nome:'Usuário local', perfil:'admin', ativo:true, trocar:false },
+                              { matricula:'F0000002', nome:'Exemplo Gerenciador', perfil:'responsavel', ativo:true, trocar:true }]);
+  window.bigodeAuth = {
+    perfil: PERFIL, nome:'Usuário local', matricula:'F0000001', boot:false, local:true,
+    nomePerfil: p => NOME_PERFIL[p || PERFIL] || '',
+    msgErro: e => (e && e.message) || 'Erro',
+    async trocarSenha(atual, nova){ if(!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(nova)) throw Object.assign(new Error('A senha precisa ter 8 ou mais caracteres, com letras e números.'), {codigo:'senha_fraca'}); return true; },
+    async listarUsuarios(){ return lerU(); },
+    async salvarUsuario(u){
+      const l = lerU(), i = l.findIndex(x=> x.matricula === u.matricula);
+      const reg = { matricula:u.matricula, nome:u.nome, perfil:u.perfil, ativo:u.ativo !== false, trocar: u.senha ? u.trocar !== false : (i>=0 ? l[i].trocar : true) };
+      if(i < 0 && !u.senha) throw new Error('Defina uma senha.');
+      if(i >= 0) l[i] = reg; else l.push(reg);
+      gravarU(l); return reg;
+    },
+    async removerUsuario(m){ gravarU(lerU().filter(x=> x.matricula !== m)); },
+    sair(){ location.reload(); }
+  };
+  window.bigodeSair = ()=> location.reload();
+
   const user = {
-    async canEdit(){ return true; },
-    async isOwner(){ return true; },
-    async id(){ return 'usuario-local'; },
-    async profiles(ids){ const out = {}; [].concat(ids).forEach(id => { out[id] = { id, name: id === 'usuario-local' ? 'Usuário local' : '' }; }); return out; }
+    async canEdit(){ return podeEscrever; },
+    async isOwner(){ return podeEscrever; },
+    async isAdmin(){ return PERFIL === 'admin'; },
+    async id(){ return 'Usuário local'; },
+    async profiles(ids){ const out = {}; [].concat(ids).forEach(id => { out[id] = { id, name: id }; }); return out; }
   };
 
   const downloads = {
